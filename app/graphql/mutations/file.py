@@ -11,6 +11,7 @@ from app.graphql.types import (
     FileUpdateInput,
     FileCopyResponse,
     FileInput,
+    DeleteFileResult,
 )
 from pydantic import ValidationError
 from app.schemas.file import UpdateFile, CreateFile
@@ -19,6 +20,8 @@ from app.services.file import (
     get_user_file,
     update_file,
     save_uploaded_file,
+    delete_file,
+    bulk_delete_files,
 )
 from app.services.folder import get_folder
 from app.services.copy import CopyService
@@ -32,9 +35,12 @@ class FileMutations:
         user = info.context.get("user")
         db = next(get_db())
         try:
-            file_path, mime_type, extension, size = await save_uploaded_file(input.file)
+            file_path, mime_type, extension, size = await save_uploaded_file(
+                input.file, UUID(user.sub)
+            )
+            file_name = input.name or input.file.filename
             data = CreateFile(
-                name=input.name,
+                name=file_name,
                 folder_id=input.folder_id,
                 file=file_path,
                 mime_type=mime_type,
@@ -185,6 +191,45 @@ class FileMutations:
             db.rollback()
             raise StrawberryGraphQLError(
                 "Database error occurred while moving file",
+                extensions={"code": "INTERNAL_ERROR"},
+            )
+        finally:
+            db.close()
+
+    @strawberry.mutation
+    def delete(self, info: strawberry.Info, id: UUID) -> bool:
+        user = info.context.get("user")
+        db = next(get_db())
+        try:
+            success, error = delete_file(db, UUID(user.sub), id)
+            if error:
+                raise StrawberryGraphQLError(
+                    message=f"Could not delete file: {error}",
+                    extensions={"code": error},
+                )
+            return success
+        except SQLAlchemyError:
+            db.rollback()
+            raise StrawberryGraphQLError(
+                "Database error occurred while deleting file",
+                extensions={"code": "INTERNAL_ERROR"},
+            )
+        finally:
+            db.close()
+
+    @strawberry.mutation
+    def delete_multiple(
+        self, info: strawberry.Info, ids: list[UUID]
+    ) -> list[DeleteFileResult]:
+        user = info.context.get("user")
+        db = next(get_db())
+        try:
+            results = bulk_delete_files(db, UUID(user.sub), ids)
+            return [DeleteFileResult(**result) for result in results]
+        except SQLAlchemyError:
+            db.rollback()
+            raise StrawberryGraphQLError(
+                "Database error occurred while deleting files",
                 extensions={"code": "INTERNAL_ERROR"},
             )
         finally:

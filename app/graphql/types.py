@@ -1,7 +1,7 @@
 from __future__ import annotations
 import enum
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union, Annotated
 from uuid import UUID
 
 import strawberry
@@ -62,7 +62,7 @@ class FileType(FromModelMixin):
     is_shared: bool
 
 
-ContentsType = strawberry.union("ContentsType", types=(FolderType, FileType))
+ContentsType = Annotated[Union["FolderType", "FileType"], strawberry.union("ContentsType")]
 
 
 @strawberry.type
@@ -133,6 +133,13 @@ class DeleteResponse:
     message: str
 
 
+@strawberry.type
+class DeleteFileResult:
+    id: UUID
+    success: bool
+    error: Optional[str]
+
+
 @strawberry.input
 class FileUpdateInput:
     name: Optional[str] = None
@@ -141,7 +148,7 @@ class FileUpdateInput:
 
 @strawberry.input
 class FileInput:
-    name: str
+    name: Optional[str] = None
     folder_id: Optional[UUID] = None
     file: Upload
 

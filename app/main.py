@@ -17,7 +17,7 @@ api_v1_router.include_router(users_router, prefix="/users", tags=["users"])
 api_v1_router.include_router(share_router, prefix="/s", tags=["shares"])
 api_v1_router.include_router(auth_router, prefix="", tags=["authentications", "auth"])
 api_v1_router.include_router(consent_router, prefix="/consent", tags=["consent"])
-app.include_router(file_router, prefix="/f", tags=["files"])
+api_v1_router.include_router(file_router, prefix="/files", tags=["files"])
 
 app.include_router(graphql_app, prefix="/graphql", tags=["GraphQL"])
 app.include_router(api_v1_router, prefix="/api/v1")

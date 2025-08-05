@@ -7,17 +7,30 @@ import magic
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import joinedload, Session, selectinload
 from strawberry.file_uploads import Upload
-from PIL import Image
-import io
 from app.models.file import File
 from app.models.folder import Folder
 from app.models.permission import FilePermission, FolderPermission, RoleEnum
-
 from app.schemas.file import CreateFile
+from app.services.thumbnail import generate_thumbnail
 
 MEDIA_ROOT = "media"
-os.makedirs(MEDIA_ROOT, exist_ok=True)
+THUMBNAIL_DIR = "thumbnails"
+os.makedirs(os.path.join(MEDIA_ROOT, THUMBNAIL_DIR), exist_ok=True)
 
+def _get_thumbnail_path(user_id: UUID, file_id: UUID) -> str:
+    user_thumbnail_dir = os.path.join(MEDIA_ROOT, str(user_id), THUMBNAIL_DIR)
+    return os.path.join(user_thumbnail_dir, f"{file_id}.png")
+
+def _save_thumbnail(user_id: UUID, file_id: UUID, file_path: str):
+    thumbnail_io, error = generate_thumbnail(file_path)
+    if error:
+        return
+    
+    thumbnail_path = _get_thumbnail_path(user_id, file_id)
+    os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
+
+    with open(thumbnail_path, "wb") as f:
+        f.write(thumbnail_io.getvalue())
 
 def create_file(db: Session, user_id: UUID, file_data: CreateFile):
     try:
@@ -50,6 +63,8 @@ def create_file(db: Session, user_id: UUID, file_data: CreateFile):
         db.add(file_instance)
         db.flush()
 
+        _save_thumbnail(user_id, file_instance.id, file_data.file)
+
         permission = FilePermission(
             user_id=user_id, file_id=file_instance.id, role=RoleEnum.owner
         )
@@ -78,9 +93,11 @@ def create_file(db: Session, user_id: UUID, file_data: CreateFile):
         return None, "INTERNAL_ERROR"
 
 
-async def save_uploaded_file(file: Upload) -> tuple[str, str, str, int]:
+async def save_uploaded_file(file: Upload, user_id: UUID) -> tuple[str, str, str, int]:
+    user_media_dir = os.path.join(MEDIA_ROOT, str(user_id))
+    os.makedirs(user_media_dir, exist_ok=True)
     filename_uuid = f"{uuid4()}_{file.filename}"
-    file_path = os.path.join(MEDIA_ROOT, filename_uuid)
+    file_path = os.path.join(user_media_dir, filename_uuid)
     async with aiofiles.open(file_path, "wb") as out_file:
         while chunk := await file.read(1024):
             await out_file.write(chunk)
@@ -112,6 +129,13 @@ def delete_file(db: Session, user_id: UUID, file_id: UUID):
                 os.remove(file_obj.file)
             except OSError:
                 return False, "FAILED_DELETE"
+        
+        thumbnail_path = _get_thumbnail_path(user_id, file_id)
+        if os.path.exists(thumbnail_path):
+            try:
+                os.remove(thumbnail_path)
+            except OSError:
+                pass
         db.query(FilePermission).filter(FilePermission.file_id == file_id).delete()
         db.delete(file_obj)
         db.commit()
@@ -141,16 +165,7 @@ def get_user_file(db: Session, user_id: UUID, id: UUID):
     return query, None
 
 
-def generate_thumbnail(file_path: str, size: tuple[int, int] = (128, 128)):
-    try:
-        img = Image.open(file_path)
-        img.thumbnail(size)
-        thumb_io = io.BytesIO()
-        img.save(thumb_io, format="PNG")
-        thumb_io.seek(0)
-        return thumb_io, None
-    except Exception as e:
-        return None, str(e)
+
 
 
 def get_user_files(db: Session, user_id: UUID, folder_id: Optional[UUID] = None):
@@ -208,3 +223,10 @@ def update_file(
     except SQLAlchemyError:
         db.rollback()
         return None, "INTERNAL_ERROR"
+
+def bulk_delete_files(db: Session, user_id: UUID, file_ids: list[UUID]):
+    results = []
+    for file_id in file_ids:
+        success, error = delete_file(db, user_id, file_id)
+        results.append({"id": file_id, "success": success, "error": error})
+    return results

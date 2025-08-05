@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from app.services.file import get_user_file, generate_thumbnail
+from app.services.file import get_user_file, _get_thumbnail_path
 from app.schemas.auth import TokenData
 from app.core.auth import get_current_user
 from app.database import get_db
@@ -29,7 +29,7 @@ async def get_file(
     return FileResponse(file.file, media_type=file.mime_type, filename=file.name)
 
 
-@router.get("/t/{id}")
+@router.get("/{id}/thumbnail")
 async def get_thumbnail(
     id: UUID,
     current_user: TokenData = Depends(get_current_user),
@@ -46,13 +46,5 @@ async def get_thumbnail(
     if error:
         raise HTTPException(status_code=500, detail=error)
 
-    if not file.mime_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File is not an image")
-
-    thumbnail_io, error = generate_thumbnail(file.file)
-    if error:
-        raise HTTPException(
-            status_code=500, detail=f"Thumbnail generation failed: {error}"
-        )
-
-    return StreamingResponse(thumbnail_io, media_type="image/png")
+    thumbnail_path = _get_thumbnail_path(UUID(user_id), file.id)
+    return FileResponse(thumbnail_path, media_type="image/png")
