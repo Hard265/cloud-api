@@ -17,20 +17,23 @@ MEDIA_ROOT = "media"
 THUMBNAIL_DIR = "thumbnails"
 os.makedirs(os.path.join(MEDIA_ROOT, THUMBNAIL_DIR), exist_ok=True)
 
+
 def _get_thumbnail_path(user_id: UUID, file_id: UUID) -> str:
     user_thumbnail_dir = os.path.join(MEDIA_ROOT, str(user_id), THUMBNAIL_DIR)
     return os.path.join(user_thumbnail_dir, f"{file_id}.png")
+
 
 def _save_thumbnail(user_id: UUID, file_id: UUID, file_path: str):
     thumbnail_io, error = generate_thumbnail(file_path)
     if error:
         return
-    
+
     thumbnail_path = _get_thumbnail_path(user_id, file_id)
     os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
 
     with open(thumbnail_path, "wb") as f:
         f.write(thumbnail_io.getvalue())
+
 
 def create_file(db: Session, user_id: UUID, file_data: CreateFile):
     try:
@@ -129,7 +132,7 @@ def delete_file(db: Session, user_id: UUID, file_id: UUID):
                 os.remove(file_obj.file)
             except OSError:
                 return False, "FAILED_DELETE"
-        
+
         thumbnail_path = _get_thumbnail_path(user_id, file_id)
         if os.path.exists(thumbnail_path):
             try:
@@ -163,9 +166,6 @@ def get_user_file(db: Session, user_id: UUID, id: UUID):
     if not query:
         return None, "NOT_FOUND"
     return query, None
-
-
-
 
 
 def get_user_files(db: Session, user_id: UUID, folder_id: Optional[UUID] = None):
@@ -223,6 +223,7 @@ def update_file(
     except SQLAlchemyError:
         db.rollback()
         return None, "INTERNAL_ERROR"
+
 
 def bulk_delete_files(db: Session, user_id: UUID, file_ids: list[UUID]):
     results = []

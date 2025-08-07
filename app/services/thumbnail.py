@@ -5,18 +5,19 @@ import mimetypes
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
+
 def _generate_pdf_thumbnail(file_path: str, size: tuple[int, int]) -> io.BytesIO:
     try:
         reader = PdfReader(file_path)
         page = reader.pages[0]
-        xObject = page['/Resources']['/XObject'].get_object()
+        xObject = page["/Resources"]["/XObject"].get_object()
 
         image_data = None
         for obj in xObject:
-            if xObject[obj]['/Subtype'] == '/Image':
+            if xObject[obj]["/Subtype"] == "/Image":
                 image_data = xObject[obj].get_data()
                 break
-        
+
         if not image_data:
             return None
 
@@ -29,6 +30,7 @@ def _generate_pdf_thumbnail(file_path: str, size: tuple[int, int]) -> io.BytesIO
     except (PdfReadError, KeyError, IndexError):
         return None
 
+
 def _generate_image_thumbnail(file_path: str, size: tuple[int, int]) -> io.BytesIO:
     img = Image.open(file_path)
     img.thumbnail(size)
@@ -37,22 +39,23 @@ def _generate_image_thumbnail(file_path: str, size: tuple[int, int]) -> io.Bytes
     thumb_io.seek(0)
     return thumb_io
 
+
 def _generate_video_thumbnail(file_path: str, size: tuple[int, int]) -> io.BytesIO:
     out, _ = (
-        ffmpeg
-        .input(file_path)
-        .filter('scale', size[0], -1)
-        .output('pipe:', vframes=1, format='image2', vcodec='png')
+        ffmpeg.input(file_path)
+        .filter("scale", size[0], -1)
+        .output("pipe:", vframes=1, format="image2", vcodec="png")
         .run(capture_stdout=True, quiet=True)
     )
     return io.BytesIO(out)
 
+
 def generate_thumbnail(file_path: str, size: tuple[int, int] = (128, 128)):
     try:
         mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type == 'application/pdf':
+        if mime_type == "application/pdf":
             thumb_io = _generate_pdf_thumbnail(file_path, size)
-        elif mime_type and mime_type.startswith('video/'):
+        elif mime_type and mime_type.startswith("video/"):
             thumb_io = _generate_video_thumbnail(file_path, size)
         else:
             thumb_io = _generate_image_thumbnail(file_path, size)

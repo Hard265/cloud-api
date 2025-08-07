@@ -62,7 +62,9 @@ class FileType(FromModelMixin):
     is_shared: bool
 
 
-ContentsType = Annotated[Union["FolderType", "FileType"], strawberry.union("ContentsType")]
+ContentsType = Annotated[
+    Union["FolderType", "FileType"], strawberry.union("ContentsType")
+]
 
 
 @strawberry.type

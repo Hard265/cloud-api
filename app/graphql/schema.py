@@ -19,6 +19,7 @@ from app.graphql.queries.permission import (
     FilePermissionQueries,
     FolderPermissionQueries,
 )
+from app.graphql.queries.search import SearchQueries
 from app.graphql.permissions import IsAuthenticated
 
 
@@ -43,6 +44,10 @@ class Query:
     @strawberry.field(permission_classes=[IsAuthenticated])
     def folder_permission(self) -> FolderPermissionQueries:
         return FolderPermissionQueries()
+
+    @strawberry.field(permission_classes=[IsAuthenticated])
+    def search(self) -> SearchQueries:
+        return SearchQueries()
 
 
 @strawberry.type

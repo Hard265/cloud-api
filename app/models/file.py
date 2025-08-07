@@ -53,7 +53,7 @@ class File(Base):
     @property
     def owner(self) -> Optional[User]:
         return next(
-            (perm.user for perm in self.permissions if perm.role == RoleEnum.viewer),
+            (perm.user for perm in self.permissions if perm.role == RoleEnum.owner),
             None,
         )
 
