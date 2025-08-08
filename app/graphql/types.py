@@ -190,3 +190,25 @@ class LinkInput:
     folder_id: Optional[UUID] = None
     password: Optional[str] = None
     expires_at: Optional[datetime] = None
+
+
+@strawberry.enum
+class ContentType(str, enum.Enum):
+    FILE = "file"
+    FOLDER = "folder"
+
+
+@strawberry.input
+class FilterInput:
+    type: Optional[ContentType] = None
+    mime_type: Optional[str] = None
+    created_at_after: Optional[datetime] = None
+    created_at_before: Optional[datetime] = None
+    updated_at_after: Optional[datetime] = None
+    updated_at_before: Optional[datetime] = None
+    size_greater_than: Optional[int] = None
+    size_less_than: Optional[int] = None
+    owner_id: Optional[UUID] = None
+    shared_with_me: Optional[bool] = None
+    shared_by_me: Optional[bool] = None
+    starred: Optional[bool] = None
